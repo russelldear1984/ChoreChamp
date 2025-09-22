@@ -1,0 +1,415 @@
+{% extends "base.html" %}
+
+{% block title %}{{ child.name }}'s Dashboard - Chore Champions{% endblock %}
+
+{% block content %}
+<div class="min-h-screen p-4">
+    <div class="max-w-6xl mx-auto">
+        <!-- Header -->
+        <div class="bg-white rounded-3xl shadow-2xl p-6 mb-6">
+            <div class="flex flex-col md:flex-row items-center justify-between">
+                <div class="flex items-center space-x-4 mb-4 md:mb-0">
+                    <span class="text-6xl">{{ child.avatar }}</span>
+                    <div>
+                        <h1 class="text-4xl font-bold text-{{ child.color }}-600">{{ child.name }}</h1>
+                        <p class="text-gray-600">Level {{ child.level }} Champion</p>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-6">
+                    <!-- Streak Counter -->
+                    <div class="text-center">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-3xl flame-animation">🔥</span>
+                            <span class="text-2xl font-bold text-orange-500">{{ child.streak_count }}</span>
+                        </div>
+                        <p class="text-sm text-gray-600">Day Streak</p>
+                    </div>
+                    
+                    <!-- XP Progress -->
+                    <div class="text-center">
+                        <div class="text-2xl font-bold text-blue-600">{{ child.xp }} XP</div>
+                        <div class="w-32 bg-gray-200 rounded-full h-3 mt-1">
+                            <div 
+                                class="bg-blue-500 h-3 rounded-full transition-all duration-500" 
+                                style="width: {{ ((child.xp % 50) / 50 * 100) }}%"
+                            ></div>
+                        </div>
+                        <p class="text-sm text-gray-600">{{ 50 - (child.xp % 50) }} to next level</p>
+                    </div>
+                    
+                    <!-- Home Button -->
+                    <button 
+                        onclick="window.location.href='/'"
+                        class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-xl"
+                    >
+                        🏠 Home
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="grid lg:grid-cols-3 gap-6">
+            <!-- Today's Quests -->
+            <div class="lg:col-span-2">
+                <div class="bg-white rounded-3xl shadow-2xl p-6">
+                    <h2 class="text-3xl font-bold text-gray-800 mb-6 flex items-center">
+                        ⚔️ Today's Quests
+                        <span id="todayDate" class="text-lg font-normal text-gray-500 ml-auto"></span>
+                    </h2>
+                    
+                    <div id="questsList" class="space-y-4">
+                        <!-- Quests will be loaded here -->
+                        <div class="text-center py-8">
+                            <div class="animate-spin text-4xl mb-4">⏳</div>
+                            <p class="text-gray-600">Loading today's quests...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Sidebar -->
+            <div class="space-y-6">
+                <!-- Sibling Progress -->
+                {% if sibling %}
+                <div class="bg-white rounded-3xl shadow-2xl p-6">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                        👥 Sibling Check
+                    </h3>
+                    
+                    <div class="text-center">
+                        <span class="text-4xl">{{ sibling.avatar }}</span>
+                        <h4 class="text-xl font-bold text-{{ sibling.color }}-600 mt-2">{{ sibling.name }}</h4>
+                        <div class="mt-3">
+                            <div class="text-lg font-semibold text-gray-700">Level {{ sibling.level }}</div>
+                            <div class="text-sm text-gray-600">{{ sibling.xp }} XP</div>
+                            <div class="flex items-center justify-center mt-2">
+                                <span class="text-lg">🔥</span>
+                                <span class="text-lg font-bold text-orange-500 ml-1">{{ sibling.streak_count }}</span>
+                            </div>
+                        </div>
+                        
+                        <div id="siblingWeeklyProgress" class="mt-4">
+                            <div class="text-sm text-gray-600">This Week</div>
+                            <div id="siblingWeeklyPoints" class="text-lg font-bold text-purple-600">-</div>
+                        </div>
+                    </div>
+                </div>
+                {% endif %}
+                
+                <!-- Badge Trophy Cabinet -->
+                <div class="bg-white rounded-3xl shadow-2xl p-6">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                        🏆 Trophy Cabinet
+                    </h3>
+                    
+                    <div id="badgesList" class="grid grid-cols-2 gap-3">
+                        <!-- Badges will be loaded here -->
+                        <div class="col-span-2 text-center py-4">
+                            <div class="animate-spin text-2xl mb-2">⏳</div>
+                            <p class="text-gray-600 text-sm">Loading badges...</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Weekly Progress -->
+                <div class="bg-white rounded-3xl shadow-2xl p-6">
+                    <h3 class="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+                        📊 This Week
+                    </h3>
+                    
+                    <div class="text-center">
+                        <div id="weeklyPoints" class="text-3xl font-bold text-purple-600">-</div>
+                        <p class="text-gray-600">Total Points</p>
+                        
+                        <div class="mt-4">
+                            <div class="w-full bg-gray-200 rounded-full h-4">
+                                <div id="weeklyProgress" class="bg-purple-500 h-4 rounded-full transition-all duration-500" style="width: 0%"></div>
+                            </div>
+                            <p class="text-sm text-gray-600 mt-2">Progress to full reward</p>
+                        </div>
+                        
+                        <div id="estimatedPayout" class="mt-4 p-3 bg-green-100 rounded-xl">
+                            <div class="text-sm text-gray-600">Estimated Pocket Money</div>
+                            <div class="text-xl font-bold text-green-600">£0.00</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Nudge Banner -->
+        <div id="nudgeBanner" class="hidden fixed bottom-4 left-4 right-4 bg-yellow-400 text-black p-4 rounded-2xl shadow-2xl z-40">
+            <div class="flex items-center justify-center space-x-2">
+                <span class="text-2xl">⏰</span>
+                <span class="font-bold">Hey {{ child.name }}! You can still earn more points today!</span>
+                <button onclick="hideNudge()" class="ml-auto text-black hover:text-gray-700">✕</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const childId = {{ child.id }};
+    let todayTasks = [];
+    let childData = {};
+    let siblingData = {};
+    
+    // Initialize page
+    document.addEventListener('DOMContentLoaded', function() {
+        loadTodayTasks();
+        loadChildData();
+        loadBadges();
+        updateDate();
+        checkNudgeTime();
+    });
+    
+    function updateDate() {
+        const today = new Date();
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('todayDate').textContent = today.toLocaleDateString('en-US', options);
+    }
+    
+    async function loadTodayTasks() {
+        try {
+            const response = await fetch(`/api/tasks/today?child_id=${childId}`);
+            const tasks = await response.json();
+            todayTasks = tasks;
+            renderTasks(tasks);
+        } catch (error) {
+            console.error('Error loading tasks:', error);
+            showError('Failed to load tasks');
+        }
+    }
+    
+    function renderTasks(tasks) {
+        const container = document.getElementById('questsList');
+        
+        if (tasks.length === 0) {
+            container.innerHTML = `
+                <div class="text-center py-8">
+                    <span class="text-6xl mb-4 block">🎉</span>
+                    <h3 class="text-2xl font-bold text-green-600">All quests completed!</h3>
+                    <p class="text-gray-600">You're a champion today!</p>
+                </div>
+            `;
+            return;
+        }
+        
+        container.innerHTML = tasks.map(task => `
+            <div class="bg-gray-50 rounded-2xl p-4 border-2 ${task.completed_today ? 'border-green-300 bg-green-50' : 'border-gray-200'}">
+                <div class="flex items-center justify-between">
+                    <div class="flex-1">
+                        <h4 class="text-xl font-bold ${task.completed_today ? 'text-green-600 line-through' : 'text-gray-800'}">${task.name}</h4>
+                        <p class="text-gray-600 mt-1">${task.description}</p>
+                        <div class="flex items-center mt-2 space-x-3">
+                            <span class="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">${task.points} XP</span>
+                            <span class="bg-gray-100 text-gray-800 px-3 py-1 rounded-full text-sm">${task.category}</span>
+                            ${task.is_required ? '<span class="bg-red-100 text-red-800 px-3 py-1 rounded-full text-sm">Required</span>' : ''}
+                        </div>
+                    </div>
+                    
+                    <div class="ml-4">
+                        ${task.completed_today 
+                            ? `<div class="text-6xl">✅</div>`
+                            : `<button 
+                                onclick="completeTask(${task.id})" 
+                                class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-2xl font-bold text-lg transform hover:scale-105 transition-all duration-200 pulse-glow"
+                                id="completeBtn${task.id}"
+                            >
+                                Complete!
+                            </button>`
+                        }
+                    </div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    async function completeTask(taskId) {
+        const button = document.getElementById(`completeBtn${taskId}`);
+        button.disabled = true;
+        button.textContent = 'Completing...';
+        button.classList.add('animate-pulse');
+        
+        try {
+            const response = await fetch('/api/completions', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    child_id: childId,
+                    task_id: taskId
+                })
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                // Show confetti and praise
+                showConfetti();
+                showSuccess(result.praise);
+                
+                // Check for level up
+                if (result.level_up) {
+                    setTimeout(() => {
+                        levelUpAnimation();
+                    }, 1000);
+                }
+                
+                // Show badges earned
+                if (result.badges_earned && result.badges_earned.length > 0) {
+                    setTimeout(() => {
+                        result.badges_earned.forEach(badge => {
+                            showSuccess(`New badge earned: ${badge}`);
+                        });
+                    }, 1500);
+                }
+                
+                // Update UI
+                updateChildStats(result);
+                loadTodayTasks(); // Refresh tasks
+                loadBadges(); // Refresh badges
+                
+            } else {
+                showError(result.error || 'Failed to complete task');
+                button.disabled = false;
+                button.textContent = 'Complete!';
+                button.classList.remove('animate-pulse');
+            }
+        } catch (error) {
+            console.error('Error completing task:', error);
+            showError('Failed to complete task');
+            button.disabled = false;
+            button.textContent = 'Complete!';
+            button.classList.remove('animate-pulse');
+        }
+    }
+    
+    function updateChildStats(result) {
+        // Update XP display
+        const xpElement = document.querySelector('.text-blue-600');
+        if (xpElement) {
+            xpElement.textContent = `${result.total_xp} XP`;
+        }
+        
+        // Update XP progress bar
+        const progressBar = document.querySelector('.bg-blue-500');
+        if (progressBar) {
+            const progress = (result.total_xp % 50) / 50 * 100;
+            progressBar.style.width = `${progress}%`;
+        }
+        
+        // Update "points to next level"
+        const nextLevelElement = document.querySelector('.text-gray-600');
+        if (nextLevelElement && nextLevelElement.textContent.includes('to next level')) {
+            nextLevelElement.textContent = `${50 - (result.total_xp % 50)} to next level`;
+        }
+        
+        // Update streak
+        const streakElement = document.querySelector('.text-orange-500');
+        if (streakElement) {
+            streakElement.textContent = result.streak_count;
+        }
+        
+        // Update level if changed
+        if (result.level_up) {
+            const levelElements = document.querySelectorAll('.text-indigo-600, .text-emerald-600');
+            levelElements.forEach(el => {
+                if (el.textContent.includes('Level')) {
+                    el.textContent = el.textContent.replace(/Level \d+/, `Level ${result.level}`);
+                }
+            });
+        }
+        
+        loadChildData(); // Refresh weekly stats
+    }
+    
+    async function loadChildData() {
+        try {
+            const response = await fetch('/api/children');
+            const children = await response.json();
+            
+            const child = children.find(c => c.id === childId);
+            const sibling = children.find(c => c.id !== childId);
+            
+            if (child) {
+                childData = child;
+                updateWeeklyStats(child.weekly_points);
+            }
+            
+            if (sibling) {
+                siblingData = sibling;
+                updateSiblingStats(sibling.weekly_points);
+            }
+        } catch (error) {
+            console.error('Error loading child data:', error);
+        }
+    }
+    
+    function updateWeeklyStats(weeklyPoints) {
+        document.getElementById('weeklyPoints').textContent = weeklyPoints;
+        
+        // Update progress bar (assuming 60 points is the target for full reward)
+        const progress = Math.min(weeklyPoints / 60 * 100, 100);
+        document.getElementById('weeklyProgress').style.width = `${progress}%`;
+        
+        // Estimate payout based on points
+        let estimatedPayout = 0;
+        if (weeklyPoints >= 60) { // Assuming all required tasks give ~60 points
+            estimatedPayout = 3.00;
+        } else if (weeklyPoints >= 40) {
+            estimatedPayout = 2.00;
+        } else if (weeklyPoints >= 25) {
+            estimatedPayout = 1.00;
+        }
+        
+        document.getElementById('estimatedPayout').innerHTML = `
+            <div class="text-sm text-gray-600">Estimated Pocket Money</div>
+            <div class="text-xl font-bold text-green-600">£${estimatedPayout.toFixed(2)}</div>
+        `;
+    }
+    
+    function updateSiblingStats(weeklyPoints) {
+        const siblingElement = document.getElementById('siblingWeeklyPoints');
+        if (siblingElement) {
+            siblingElement.textContent = `${weeklyPoints} pts`;
+        }
+    }
+    
+    async function loadBadges() {
+        // For now, show available badges as placeholders
+        const availableBadges = [
+            { name: 'Morning Hero', emoji: '🥇', description: '3 tasks before 9 AM', earned: false },
+            { name: 'All-Green Day', emoji: '💯', description: 'All required tasks completed', earned: false },
+            { name: 'Streak Star', emoji: '🌟', description: '5-day streak', earned: childData.streak_count >= 5 },
+            { name: 'Tidy Master', emoji: '🧹', description: 'Tidy Room 10 times', earned: false }
+        ];
+        
+        const container = document.getElementById('badgesList');
+        container.innerHTML = availableBadges.map(badge => `
+            <div class="text-center p-3 rounded-xl ${badge.earned ? 'bg-yellow-100' : 'bg-gray-100'}">
+                <div class="text-3xl ${badge.earned ? '' : 'grayscale opacity-50'}">${badge.emoji}</div>
+                <div class="text-xs font-semibold mt-1 ${badge.earned ? 'text-yellow-800' : 'text-gray-600'}">${badge.name}</div>
+            </div>
+        `).join('');
+    }
+    
+    function checkNudgeTime() {
+        const now = new Date();
+        const hour = now.getHours();
+        
+        // Show nudge after 5 PM if child hasn't completed many tasks
+        if (hour >= 17 && childData.weekly_points < 20) {
+            setTimeout(() => {
+                document.getElementById('nudgeBanner').classList.remove('hidden');
+            }, 5000);
+        }
+    }
+    
+    function hideNudge() {
+        document.getElementById('nudgeBanner').classList.add('hidden');
+    }
+</script>
+{% endblock %}

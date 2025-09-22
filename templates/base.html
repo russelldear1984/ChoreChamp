@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Chore Champions{% endblock %}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <style>
+        .bg-gradient-fun {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        }
+        .text-shadow {
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .bounce-in {
+            animation: bounceIn 0.6s ease-out;
+        }
+        @keyframes bounceIn {
+            0% { transform: scale(0.3); opacity: 0; }
+            50% { transform: scale(1.05); }
+            70% { transform: scale(0.9); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        .pulse-glow {
+            animation: pulseGlow 2s infinite;
+        }
+        @keyframes pulseGlow {
+            0%, 100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.5); }
+            50% { box-shadow: 0 0 30px rgba(59, 130, 246, 0.8); }
+        }
+        .flame-animation {
+            animation: flame 1s ease-in-out infinite alternate;
+        }
+        @keyframes flame {
+            0% { transform: scale(1) rotate(-1deg); }
+            100% { transform: scale(1.1) rotate(1deg); }
+        }
+    </style>
+</head>
+<body class="bg-gradient-fun min-h-screen">
+    {% block content %}{% endblock %}
+    
+    <script>
+        // Utility functions for the app
+        function showConfetti() {
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        }
+        
+        function showSuccess(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 bounce-in';
+            toast.innerHTML = `<span class="text-lg">${message}</span>`;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+        
+        function showError(message) {
+            const toast = document.createElement('div');
+            toast.className = 'fixed top-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg z-50 bounce-in';
+            toast.innerHTML = `<span class="text-lg">${message}</span>`;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 4000);
+        }
+        
+        function levelUpAnimation() {
+            const messages = [
+                "🎉 LEVEL UP! 🎉",
+                "🚀 You're amazing! 🚀",
+                "⭐ Keep it up! ⭐"
+            ];
+            const message = messages[Math.floor(Math.random() * messages.length)];
+            
+            const banner = document.createElement('div');
+            banner.className = 'fixed inset-0 flex items-center justify-center z-50 bg-black bg-opacity-50';
+            banner.innerHTML = `
+                <div class="bg-yellow-400 text-black px-12 py-8 rounded-2xl text-4xl font-bold bounce-in text-center">
+                    ${message}
+                </div>
+            `;
+            document.body.appendChild(banner);
+            
+            // Celebration confetti
+            confetti({
+                particleCount: 200,
+                spread: 100,
+                origin: { y: 0.4 }
+            });
+            
+            setTimeout(() => {
+                banner.remove();
+            }, 3000);
+        }
+    </script>
+</body>
+</html>
