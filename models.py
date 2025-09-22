@@ -131,10 +131,27 @@ class Settings(Base):
         return f"<Settings>"
 
 # Database setup functions
-def create_database(database_url='sqlite:///chore_champions.db'):
-    engine = create_engine(database_url)
+# Database setup functions
+def create_database():
+    """Create engine + session factory using Render's DATABASE_URL if present."""
+    import os
+
+    db_url = os.getenv("postgresql://chore_champion_db_user:lSZzKY2koxN9VQjaXBry7VzrL53nXfBC@dpg-d38ohendiees73cobcc0-a/chore_champion_db", "sqlite:///chore_champions.db")
+
+    # Normalize legacy 'postgres://' to 'postgresql+psycopg2://'
+    if db_url.startswith("postgres://"):
+        db_url = db_url.replace("postgres://", "postgresql+psycopg2://", 1)
+
+    engine = create_engine(
+        db_url,
+        future=True,
+        pool_pre_ping=True  # keeps connections healthy after idle/sleep
+    )
+    Session = sessionmaker(bind=engine, expire_on_commit=False)
+
+    # Create tables if they don't exist
     Base.metadata.create_all(engine)
-    Session = sessionmaker(bind=engine)
+
     return engine, Session
 
 def get_or_create_settings(session):
