@@ -472,6 +472,166 @@ def api_close_week():
     finally:
         session_db.close()
 
+@app.route('/api/weeks/reset', methods=['POST'])
+def reset_week():
+    """Reset the current week - remove all completions and recalculate XP/levels"""
+    if not session.get('is_parent'):
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    session_db = get_session()
+    try:
+        # Get current week start date
+        week_start = get_week_start_date()
+        
+        # Get all completions from this week with proper joins
+        this_week_completions = session_db.query(TaskCompletion).join(Task).filter(
+            TaskCompletion.date >= week_start
+        ).all()
+        
+        # Track changes for each child
+        results = []
+        for child in session_db.query(Child).all():
+            # Calculate XP to remove for this child
+            child_completions = [c for c in this_week_completions if c.child_id == child.id]
+            xp_to_remove = sum(c.task.points for c in child_completions)
+            
+            # Store original stats
+            original_level = child.level
+            
+            # Remove XP and recalculate level using proper service
+            child.xp = max(0, child.xp - xp_to_remove)
+            new_level = update_child_level(child)
+            
+            # Reset streak since we're clearing the week
+            child.streak_count = 0
+            child.last_completion_date = None
+            
+            results.append({
+                'child_name': child.name,
+                'xp_removed': xp_to_remove,
+                'new_level': new_level,
+                'level_changed': original_level != new_level
+            })
+        
+        # Delete all completions from this week
+        session_db.query(TaskCompletion).filter(
+            TaskCompletion.date >= week_start
+        ).delete()
+        
+        session_db.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': 'Week reset successfully',
+            'results': results
+        })
+        
+    except Exception as e:
+        session_db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        session_db.close()
+
+@app.route('/api/completions/recent')
+def get_recent_completions():
+    """Get recent completions from the last 7 days"""
+    if not session.get('is_parent'):
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    session_db = get_session()
+    try:
+        uk_tz = pytz.timezone('Europe/London')
+        seven_days_ago = date.today() - timedelta(days=7)
+        
+        completions = session_db.query(TaskCompletion).join(Child).join(Task).filter(
+            TaskCompletion.date >= seven_days_ago,
+            TaskCompletion.approved == True
+        ).order_by(TaskCompletion.timestamp.desc()).all()
+        
+        completion_data = []
+        for completion in completions:
+            # Convert UTC timestamp to UK timezone
+            completion_time = completion.timestamp.replace(tzinfo=pytz.UTC).astimezone(uk_tz)
+            completion_data.append({
+                'id': completion.id,
+                'child_id': completion.child_id,
+                'child_name': completion.child.name,
+                'child_avatar': completion.child.avatar,
+                'task_name': completion.task.name,
+                'points': completion.task.points,
+                'date': completion_time.strftime('%d %b'),
+                'time': completion_time.strftime('%H:%M'),
+                'day_name': completion_time.strftime('%A')
+            })
+        
+        return jsonify(completion_data)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        session_db.close()
+
+@app.route('/api/completions/<int:completion_id>', methods=['DELETE'])
+def delete_completion(completion_id):
+    """Remove a specific task completion and recalculate child stats"""
+    if not session.get('is_parent'):
+        return jsonify({'error': 'Admin access required'}), 403
+    
+    session_db = get_session()
+    try:
+        # Find the completion
+        completion = session_db.query(TaskCompletion).filter_by(id=completion_id).first()
+        if not completion:
+            return jsonify({'success': False, 'error': 'Completion not found'}), 404
+        
+        # Get child and original stats
+        child = completion.child
+        original_level = child.level
+        points_to_remove = completion.task.points
+        
+        # Remove XP and recalculate level using proper service
+        child.xp = max(0, child.xp - points_to_remove)
+        new_level = update_child_level(child)
+        
+        # Check if we need to recalculate streaks
+        # If this was a streakable required task, we may need to update streak
+        completion_date = completion.date
+        if completion.task.streakable and completion.task.is_required:
+            # Find the most recent completion date after removing this one
+            remaining_completions = session_db.query(TaskCompletion).filter(
+                TaskCompletion.child_id == child.id,
+                TaskCompletion.id != completion_id,
+                TaskCompletion.approved == True
+            ).order_by(TaskCompletion.date.desc()).first()
+            
+            if remaining_completions:
+                child.last_completion_date = remaining_completions.date
+                # Recalculate streak from scratch
+                update_streak(session_db, child, remaining_completions.date)
+            else:
+                child.streak_count = 0
+                child.last_completion_date = None
+        
+        # Delete the completion
+        child_name = child.name
+        session_db.delete(completion)
+        session_db.commit()
+        
+        return jsonify({
+            'success': True,
+            'message': f'Task completion removed successfully',
+            'child_name': child_name,
+            'new_level': new_level,
+            'level_changed': original_level != new_level,
+            'xp_removed': points_to_remove
+        })
+        
+    except Exception as e:
+        session_db.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+    finally:
+        session_db.close()
+
 if __name__ == '__main__':
     # Initialize seed data on startup
     init_seed_data()

@@ -12,15 +12,22 @@
                     <h1 class="text-4xl font-bold text-gray-800">👨‍👩‍👧‍👦 Parent Dashboard</h1>
                     <p class="text-gray-600 mt-2">Manage tasks, track progress, and configure rewards</p>
                 </div>
-                <div class="flex space-x-4">
+                <div class="flex space-x-3">
+                    <button 
+                        onclick="resetWeek()"
+                        class="bg-orange-500 hover:bg-orange-600 text-white px-4 py-3 rounded-xl font-bold text-sm"
+                        id="resetWeekBtn"
+                    >
+                        🔄 Reset Week
+                    </button>
                     <button 
                         onclick="closeWeek()"
-                        class="bg-green-500 hover:bg-green-600 text-white px-6 py-3 rounded-xl font-bold"
+                        class="bg-green-500 hover:bg-green-600 text-white px-4 py-3 rounded-xl font-bold text-sm"
                         id="closeWeekBtn"
                     >
                         📊 Close Week
                     </button>
-                    <a href="/parent/logout" class="bg-gray-500 hover:bg-gray-600 text-white px-6 py-3 rounded-xl font-bold">
+                    <a href="/parent/logout" class="bg-gray-500 hover:bg-gray-600 text-white px-4 py-3 rounded-xl font-bold text-sm">
                         🚪 Logout
                     </a>
                 </div>
@@ -79,6 +86,19 @@
                 <div class="text-center py-8">
                     <div class="animate-spin text-4xl mb-4">⏳</div>
                     <p class="text-gray-600">Loading tasks...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Recent Completions Management -->
+        <div class="bg-white rounded-3xl shadow-2xl p-6 mb-6">
+            <h2 class="text-2xl font-bold text-gray-800 mb-4">🕒 Recent Completions</h2>
+            <p class="text-gray-600 mb-4">Review and manage task completions from the last 7 days</p>
+            
+            <div id="recentCompletions" class="space-y-3">
+                <div class="text-center py-8">
+                    <div class="animate-spin text-4xl mb-4">⏳</div>
+                    <p class="text-gray-600">Loading recent completions...</p>
                 </div>
             </div>
         </div>
@@ -178,6 +198,7 @@
         loadChildrenStats();
         loadTasks();
         loadSettings();
+        loadRecentCompletions();
     });
     
     async function loadChildrenStats() {
@@ -406,6 +427,150 @@
         } catch (error) {
             console.error('Error updating settings:', error);
             showError('Failed to update settings');
+        }
+    }
+    
+    async function loadRecentCompletions() {
+        try {
+            const response = await fetch('/api/completions/recent');
+            const completions = await response.json();
+            
+            const container = document.getElementById('recentCompletions');
+            
+            if (completions.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8">
+                        <span class="text-4xl mb-4 block">📭</span>
+                        <p class="text-gray-600">No recent completions found</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = completions.map(completion => `
+                <div class="bg-gray-50 border border-gray-200 rounded-xl p-4">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-2xl">${completion.child_avatar}</span>
+                            <div class="flex-1">
+                                <h4 class="text-lg font-bold text-gray-800">${completion.child_name}</h4>
+                                <p class="text-gray-600">${completion.task_name}</p>
+                                <div class="flex items-center space-x-2 mt-1">
+                                    <span class="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-xs font-semibold">${completion.points} XP</span>
+                                    <span class="text-sm text-gray-500">${completion.day_name}, ${completion.date} at ${completion.time}</span>
+                                </div>
+                            </div>
+                        </div>
+                        <button 
+                            onclick="uncompleteTask(${completion.id})"
+                            class="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg font-semibold text-sm"
+                            id="uncompleteBtn${completion.id}"
+                        >
+                            ❌ Uncomplete
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        } catch (error) {
+            console.error('Error loading recent completions:', error);
+            showError('Failed to load recent completions');
+        }
+    }
+    
+    async function resetWeek() {
+        if (!confirm('Are you sure you want to reset this week? This will remove ALL completed tasks for this week and reset XP and streaks accordingly. This action cannot be undone!')) {
+            return;
+        }
+        
+        const button = document.getElementById('resetWeekBtn');
+        button.disabled = true;
+        button.textContent = 'Resetting...';
+        button.classList.add('animate-pulse');
+        
+        try {
+            const response = await fetch('/api/weeks/reset', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showSuccess('Week reset successfully!');
+                
+                // Show what was reset
+                if (result.results && result.results.length > 0) {
+                    result.results.forEach(childResult => {
+                        showSuccess(`${childResult.child_name}: Removed ${childResult.xp_removed} XP, now at Level ${childResult.new_level}`);
+                    });
+                }
+                
+                // Refresh all data
+                loadChildrenStats();
+                loadRecentCompletions();
+                
+                // Clear weekly summary
+                document.getElementById('weeklySummary').innerHTML = `
+                    <div class="text-center py-8">
+                        <span class="text-4xl mb-4 block">🔄</span>
+                        <p class="text-gray-600">Week has been reset. Close the week to see new summary and payouts</p>
+                    </div>
+                `;
+            } else {
+                showError(result.error || 'Failed to reset week');
+            }
+        } catch (error) {
+            console.error('Error resetting week:', error);
+            showError('Failed to reset week');
+        } finally {
+            button.disabled = false;
+            button.textContent = '🔄 Reset Week';
+            button.classList.remove('animate-pulse');
+        }
+    }
+    
+    async function uncompleteTask(completionId) {
+        if (!confirm('Are you sure you want to uncomplete this task? This will remove the XP and may affect the child\'s level and streak.')) {
+            return;
+        }
+        
+        const button = document.getElementById(`uncompleteBtn${completionId}`);
+        button.disabled = true;
+        button.textContent = 'Removing...';
+        button.classList.add('animate-pulse');
+        
+        try {
+            const response = await fetch(`/api/completions/${completionId}`, {
+                method: 'DELETE'
+            });
+            
+            const result = await response.json();
+            
+            if (result.success) {
+                showSuccess(result.message);
+                
+                // Show XP/level changes if significant
+                if (result.level_changed) {
+                    showSuccess(`${result.child_name} is now Level ${result.new_level}`);
+                }
+                
+                // Refresh data
+                loadChildrenStats();
+                loadRecentCompletions();
+            } else {
+                showError(result.error || 'Failed to uncomplete task');
+                button.disabled = false;
+                button.textContent = '❌ Uncomplete';
+                button.classList.remove('animate-pulse');
+            }
+        } catch (error) {
+            console.error('Error uncompleting task:', error);
+            showError('Failed to uncomplete task');
+            button.disabled = false;
+            button.textContent = '❌ Uncomplete';
+            button.classList.remove('animate-pulse');
         }
     }
 </script>
