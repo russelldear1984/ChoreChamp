@@ -1,0 +1,127 @@
+Build a playful, kid-friendly web app called “Chore Champions”.
+It helps two children (Martha and Betsy) complete daily behaviours/tasks for points (XP) that convert to weekly pocket money. The app must feel game-like with confetti, badges, levels, streaks, and a sibling leaderboard.
+
+Stack & Project
+	•	Backend: Python Flask + SQLite using SQLAlchemy ORM.
+	•	Frontend: HTML + Vanilla JS + TailwindCSS (CDN); mobile-first, bright and fun.
+	•	Run: Single main.py for Flask. Provide requirements.txt (Flask, SQLAlchemy, Flask-CORS, pytz).
+	•	Persistence: SQLite file in project root.
+	•	Docs: README.md with setup/run instructions on Replit (note free tier sleeps when idle).
+	•	Auth (simple): Parent enters a PIN (default 1234) to access Admin. Kids select their avatar/name (no password for MVP).
+
+Core Roles & Flows
+
+Parent (Admin)
+	•	Manage task catalogue (shared for both children): name, description, XP value, category (DAILY, BEHAVIOUR, WEEKLY), is_required (bool), streakable (bool), active_days (Mon–Sun flags).
+	•	Configure weekly pocket money rules:
+	•	Full payout: £3.00 if all required tasks completed for the week.
+	•	Tiered thresholds (editable list): e.g. [{min_points:40, amount:2.0}, {min_points:25, amount:1.0}].
+	•	View weekly summary for each child and a leaderboard.
+	•	Approve/revoke completions (anti-cheat).
+	•	Close Week button: computes payouts, saves summaries, resets week counters (also auto-close job is OK but free Replit may sleep; manual button is required).
+	•	Edit parent PIN.
+
+Child (Martha or Betsy)
+	•	See Today’s Quests (tasks due today) with big “Complete” buttons.
+	•	On completion: add XP, update streaks, trigger confetti and random praise emoji. Prevent duplicate completion per day unless task explicitly allows repeat.
+	•	See sibling progress (read-only): points and tasks done.
+	•	Earn badges; view Trophy Cabinet.
+	•	See XP bar and current Level; show streak flame 🔥 count.
+	•	Get in-app nudges (no email): if behind today’s target by 5pm, show a friendly prompt (“Two more quests to reach the next reward!”).
+
+Data Model (SQLAlchemy)
+	•	Child: id, name, avatar (emoji/short label), color, xp (int), level (int), streak_count (int), last_completion_date (date).
+	•	Task: id, name, description, points (XP int), category (enum: DAILY|BEHAVIOUR|WEEKLY), is_required (bool), streakable (bool), active_days (JSON array of weekday ints 0=Mon … 6=Sun).
+	•	TaskCompletion: id, child_id (FK), task_id (FK), timestamp (UTC), date (YYYY-MM-DD), approved (bool default True).
+	•	Badge: id, child_id (FK), name, emoji, description, earned_date.
+	•	WeekSummary: id, week_start_date (ISO Monday), child_id, total_points, required_tasks_completed (bool), payout_amount_decimal.
+	•	Settings (singleton id=1): full_payout_amount_decimal (default 3.00), threshold_rules (JSON list of {min_points, amount}), timezone (default "Europe/London"), parent_pin (hash/str).
+
+Add useful indexes: TaskCompletion(child_id, date), TaskCompletion(task_id, date).
+
+Scoring, Levels, Streaks, Payout
+	•	XP per task = Task.points.
+	•	Level up every 50 XP (config constant); on level up show celebratory banner/emoji.
+	•	Streaks: if the child completes ≥1 required daily task on consecutive days, increment streak_count. Break if a day is missed (only count days that have required tasks). Show 🔥 with the current count.
+	•	Badges (implement checks when recording a completion):
+	•	Morning Hero (🥇): 3 tasks completed before 09:00 local in a single day.
+	•	All-Green Day (💯): all required tasks for today completed.
+	•	Streak Star (🌟): streak reaches 5 days.
+	•	Tidy Master (🧹): completed “Tidy Room” 10 times total.
+	•	Weekly Close (Sunday 23:59 local or manual button):
+	1.	Sum weekly points per child.
+	2.	If all required tasks for the week (for their applicable days) are completed → payout = full £3.00.
+	3.	Else choose the highest threshold in threshold_rules satisfied by weekly points.
+	4.	Save a WeekSummary per child and reset the “current week” counters where appropriate (do NOT erase history).
+	•	Provide an Admin “Close Week” button that calls the same logic on demand.
+
+API (JSON, prefix /api)
+	•	Children: GET /children (with weekly stats), POST /children (admin), PATCH /children/:id (admin).
+	•	Tasks: GET /tasks, POST /tasks (admin), PATCH /tasks/:id (admin), DELETE /tasks/:id (admin), GET /tasks/today?child_id=....
+	•	Completions: POST /completions body {child_id, task_id} (create today if not done), returns updated totals + praise message; DELETE /completions/:id (admin) revoke.
+	•	Score/Weeks: GET /score/weekly?child_id=...; POST /weeks/close; GET /weeks/history?child_id=....
+	•	Settings: GET /settings; PATCH /settings (admin).
+
+Use proper HTTP status codes and {error:"..."} on failures. Validate inputs.
+
+Pages (Jinja Templates)
+	•	/ (Login)
+	•	Parent card (PIN field). Children card with two big avatar buttons for Martha and Betsy.
+	•	/kid/<child_id>
+	•	Header: avatar, name, week dates, current level + XP bar.
+	•	Today’s Quests list with big Complete buttons; success shows confetti and random praise (emoji list).
+	•	Progress bars: Today XP and Week XP.
+	•	🔥 Streak counter.
+	•	Badges carousel (earned + grayed locked).
+	•	Sibling Peek card (read-only progress comparison).
+	•	Nudge banner if behind target after 17:00 local.
+	•	/parent
+	•	This Week snapshot for both kids (points, required-task status, projected payout).
+	•	Task Catalogue (CRUD) with name/points/category/required/streakable/active days.
+	•	Pocket Money Rules editor: full payout + threshold rows (add/remove).
+	•	Manual controls: Revoke completion, Add completion, Close Week button.
+	•	History table: past weeks for each child (points, payout, badges earned count).
+	•	Edit Parent PIN.
+
+Seed Data (on first run)
+	•	Children:
+	•	Martha → avatar "🦊", color indigo
+	•	Betsy → avatar "🐣", color emerald
+	•	Tasks (examples):
+	•	“Make Bed” (DAILY, 5 XP, required, streakable, Mon–Sun)
+	•	“Brush Teeth AM” (DAILY, 3 XP, required, streakable, Mon–Sun)
+	•	“Brush Teeth PM” (DAILY, 3 XP, required, streakable, Mon–Sun)
+	•	“Homework” (DAILY, 8 XP, required, Mon–Fri)
+	•	“Be Kind to Sibling” (BEHAVIOUR, 5 XP, streakable, Mon–Sun)
+	•	“Tidy Room” (WEEKLY, 15 XP, required, Sun)
+	•	Settings:
+	•	full_payout_amount_decimal = 3.00
+	•	threshold_rules = [{ "min_points": 40, "amount": 2.0 }, { "min_points": 25, "amount": 1.0 }]
+	•	timezone = "Europe/London"
+	•	parent_pin = "1234" (simple string is fine for MVP)
+
+Gamified UX Requirements
+	•	Use bright colours, emojis, large buttons and subtle animations (hover/tap).
+	•	Completion triggers: confetti + random praise (“Superstar! 🌟”, “Level up! 🚀”, “Nice streak! 🔥”).
+	•	Weekly Victory Screen (modal or page) after closing week: show crowns 👑 on the leader, list badges earned, payout amount.
+
+Implementation Notes
+	•	Prevent multiple completions of the same daily task per day unless you add a repeatable flag.
+	•	Level calculation: level = floor(xp / 50) + 1. Show smooth XP bar fill.
+	•	Streak logic: Increment if child completes at least one required daily task for that date; reset if next valid day has zero required completions.
+	•	Badge checks run after every completion; insert once per badge (avoid duplicates).
+	•	Keep code organized: routes blueprint(s), models, services (scoring/badges), templates in /templates, static files (confetti JS) in /static.
+
+Acceptance Tests
+	•	Completing a task updates today + week XP, shows confetti, and can’t be double-clicked.
+	•	Level increases exactly at 50, 100, 150 XP… with a visible celebration.
+	•	Streak increases day-to-day and resets if a required day is missed.
+	•	Badges award under the defined conditions and persist in the Trophy Cabinet.
+	•	Close Week computes payouts correctly: full £3 if all required done; else threshold payout.
+	•	Revoke completion reduces XP/streaks if relevant.
+	•	Leaderboard shows who’s ahead; crown on the leader in Victory Screen.
+	•	Seed data loads on first run and creates the SQLite DB automatically.
+
+Deliverables: Full working Flask app with main.py, models.py (or inline models), templates, static assets, requirements.txt, and README.md.
+
+Nice-to-have (optional if time allows): CSV export of WeekSummary, dark mode, simple PWA manifest.
