@@ -8,3 +8,4 @@ Flask-CORS==4.0.0
 pytz==2023.3
 SQLAlchemy>=2.0.41
 typing_extensions<=4.12.2
+psycopg2-binary>=2.9
